@@ -212,10 +212,10 @@ class BaseSampleModel():
 
         return min_encodings_indices_return_list
 
-    def sample_and_refine(self, save_dir=None, img_name=None):
+    def sample_and_refine(self, smp_step, save_dir=None, img_name=None):
         # sample 32x16 features indices
         sampled_top_indices_list = self.sample_fn(
-            temp=1, sample_steps=self.sample_steps)
+            temp=1, sample_steps= smp_step)
 
         for sample_idx in range(self.batch_size):
             sample_indices = [

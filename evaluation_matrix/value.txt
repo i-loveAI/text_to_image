@@ -1,0 +1,10 @@
+服裝形狀完整度 1~5
+x軸服裝種類
+y軸pose
+
+T-shirt+短褲
+T-shirt+長褲
+T-shirt+短裙
+T-shirt+長裙
+短袖 T-shirt Jacket
+長袖 T-shirt Jacket
