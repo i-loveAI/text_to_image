@@ -25,7 +25,6 @@ class BaseSampleModel():
         self.opt = opt
         self.device = torch.device('cuda')
 
-        # hierarchical VQVAE
         self.decoder = Decoder(
             in_channels=opt['top_in_channels'],
             resolution=opt['top_resolution'],
@@ -64,7 +63,6 @@ class BaseSampleModel():
                                                    1).to(self.device)
         self.load_bot_pretrain_network()
 
-        # top -> bot prediction
         self.index_pred_guidance_encoder = UNet(
             in_channels=opt['index_pred_encoder_in_channels']).to(self.device)
         self.index_pred_decoder = MultiHeadFCNHead(
@@ -79,7 +77,6 @@ class BaseSampleModel():
             num_head=18).to(self.device)
         self.load_index_pred_network()
 
-        # VAE for segmentation mask
         self.segm_encoder = Encoder(
             ch=opt['segm_ch'],
             num_res_blocks=opt['segm_num_res_blocks'],
@@ -100,7 +97,6 @@ class BaseSampleModel():
                                                1).to(self.device)
         self.load_pretrained_segm_token()
 
-        # define sampler
         self.sampler_fn = TransformerMultiHead(
             codebook_size=opt['codebook_size'],
             segm_codebook_size=opt['segm_codebook_size'],
@@ -122,7 +118,6 @@ class BaseSampleModel():
         self.sample_steps = opt['sample_steps']
 
     def load_top_pretrain_models(self):
-        # load pretrained vqgan
         top_vae_checkpoint = torch.load(self.opt['top_vae_path'])
 
         self.decoder.load_state_dict(
@@ -152,7 +147,6 @@ class BaseSampleModel():
         self.bot_post_quant_conv.eval()
 
     def load_pretrained_segm_token(self):
-        # load pretrained vqgan for segmentation mask
         segm_token_checkpoint = torch.load(self.opt['segm_token_path'])
         self.segm_encoder.load_state_dict(
             segm_token_checkpoint['encoder'], strict=True)
@@ -213,7 +207,6 @@ class BaseSampleModel():
         return min_encodings_indices_return_list
 
     def sample_and_refine(self, smp_step, save_dir=None, img_name=None):
-        # sample 32x16 features indices
         sampled_top_indices_list = self.sample_fn(
             temp=1, sample_steps= smp_step)
 
@@ -236,7 +229,7 @@ class BaseSampleModel():
                 bot_indices_list, self.texture_mask[sample_idx:sample_idx + 1],
                 (bot_indices_list[0].size(0), bot_indices_list[0].size(1),
                  bot_indices_list[0].size(2),
-                 self.opt["bot_z_channels"]))  #.permute(0, 3, 1, 2)
+                 self.opt["bot_z_channels"]))  
             quant_bot = self.bot_post_quant_conv(quant_bot)
             bot_dec_res = self.bot_decoder_res(quant_bot)
 
@@ -267,7 +260,6 @@ class BaseSampleModel():
 
         texture_mask_flatten = texture_tokens.view(-1)
 
-        # min_encodings_indices_list would be used to visualize the image
         min_encodings_indices_list = [
             torch.full(
                 texture_mask_flatten.size(),
@@ -282,41 +274,35 @@ class BaseSampleModel():
                            device=self.device,
                            dtype=torch.long)
 
-            # where to unmask
             changes = torch.rand(
                 x_t.shape, device=self.device) < 1 / t.float().unsqueeze(-1)
-            # don't unmask somewhere already unmasked
             changes = torch.bitwise_xor(changes,
                                         torch.bitwise_and(changes, unmasked))
-            # update mask with changes
             unmasked = torch.bitwise_or(unmasked, changes)
 
             x_0_logits_list = self.sampler_fn(
                 x_t, self.segm_tokens, texture_tokens, t=t)
 
             changes_flatten = changes.view(-1)
-            ori_shape = x_t.shape  # [b, h*w]
-            x_t = x_t.view(-1)  # [b*h*w]
+            ori_shape = x_t.shape 
+            x_t = x_t.view(-1) 
             for codebook_idx, x_0_logits in enumerate(x_0_logits_list):
                 if torch.sum(texture_mask_flatten[changes_flatten] ==
                              codebook_idx) > 0:
-                    # scale by temperature
                     x_0_logits = x_0_logits / temp
                     x_0_dist = dists.Categorical(logits=x_0_logits)
                     x_0_hat = x_0_dist.sample().long()
                     x_0_hat = x_0_hat.view(-1)
 
-                    # only replace the changed indices with corresponding codebook_idx
                     changes_segm = torch.bitwise_and(
                         changes_flatten, texture_mask_flatten == codebook_idx)
 
-                    # x_t would be the input to the transformer, so the index range should be continual one
                     x_t[changes_segm] = x_0_hat[
                         changes_segm] + 1024 * codebook_idx
                     min_encodings_indices_list[codebook_idx][
                         changes_segm] = x_0_hat[changes_segm]
 
-            x_t = x_t.view(ori_shape)  # [b, h*w]
+            x_t = x_t.view(ori_shape) 
 
         min_encodings_indices_return_list = [
             min_encodings_indices.view(ori_shape)
@@ -467,18 +453,13 @@ class SampleFromPoseModel(BaseSampleModel):
         self.texture_mask = torch.stack(mask_batch, dim=0).to(torch.float32)
 
     def feed_pose_data(self, pose_img):
-        # for ui demo
-
         self.pose = pose_img.to(self.device)
         self.batch_size = self.pose.size(0)
 
     def feed_shape_attributes(self, shape_attr):
-        # for ui demo
-
         self.shape_attr = shape_attr.to(self.device)
 
     def feed_texture_attributes(self, texture_attr):
-        # for ui demo
 
         self.upper_fused_attr = texture_attr[0].unsqueeze(0).to(self.device)
         self.lower_fused_attr = texture_attr[1].unsqueeze(0).to(self.device)
@@ -493,6 +474,4 @@ class SampleFromPoseModel(BaseSampleModel):
         color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
         for label, color in enumerate(palette):
             color_seg[seg == label, :] = color
-        # convert to BGR
-        # color_seg = color_seg[..., ::-1]
         return color_seg

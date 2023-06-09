@@ -103,7 +103,6 @@ class HierarchyVQSpatialTextureAwareModel():
         self.init_training_settings()
 
     def load_top_pretrain_models(self):
-        # load pretrained vqgan for segmentation mask
         top_vae_checkpoint = torch.load(self.opt['top_vae_path'])
         self.top_encoder.load_state_dict(
             top_vae_checkpoint['encoder'], strict=True)
@@ -159,7 +158,6 @@ class HierarchyVQSpatialTextureAwareModel():
             self.disc.parameters(), lr=self.opt['lr'])
 
     def load_discriminator_models(self):
-        # load pretrained vqgan for segmentation mask
         top_vae_checkpoint = torch.load(self.opt['top_vae_path'])
         self.disc.load_state_dict(
             top_vae_checkpoint['discriminator'], strict=True)
@@ -254,17 +252,17 @@ class HierarchyVQSpatialTextureAwareModel():
         x, mask = self.feed_data(data)
         xrec, codebook_loss = self.forward_step(x, mask)
 
-        # get recon/perceptual loss
+       
         recon_loss = torch.abs(x.contiguous() - xrec.contiguous())
         p_loss = self.perceptual(x.contiguous(), xrec.contiguous())
         nll_loss = recon_loss + self.perceptual_weight * p_loss
         nll_loss = torch.mean(nll_loss)
 
-        # augment for input to discriminator
+        
         if self.diff_aug:
             xrec = DiffAugment(xrec, policy=self.policy)
 
-        # update generator
+        
         logits_fake = self.disc(xrec)
         g_loss = -torch.mean(logits_fake)
         last_layer = self.decoder.conv_out.weight
@@ -288,7 +286,7 @@ class HierarchyVQSpatialTextureAwareModel():
             else:
                 logits_real = self.disc(x.contiguous().detach())
             logits_fake = self.disc(xrec.contiguous().detach(
-            ))  # detach so that generator isn"t also updated
+            )) 
             d_loss = hinge_d_loss(logits_real, logits_fake)
             self.log_dict["d_loss"] = d_loss
         else:
@@ -322,9 +320,7 @@ class HierarchyVQSpatialTextureAwareModel():
             num += x.size(0)
 
             if x.shape[1] > 3:
-                # colorize with random projection
                 assert xrec.shape[1] > 3
-                # convert logits to indices
                 xrec = torch.argmax(xrec, dim=1, keepdim=True)
                 xrec = F.one_hot(xrec, num_classes=x.shape[1])
                 xrec = xrec.squeeze(1).permute(0, 3, 1, 2).float()
@@ -343,13 +339,6 @@ class HierarchyVQSpatialTextureAwareModel():
         return self.log_dict
 
     def update_learning_rate(self, epoch):
-        """Update learning rate.
-
-        Args:
-            current_iter (int): Current iteration.
-            warmup_iter (int): Warmup iter numbers. -1 for no warmup.
-                Default: -1.
-        """
         lr = self.optimizer.param_groups[0]['lr']
 
         if self.opt['lr_decay'] == 'step':
@@ -362,8 +351,6 @@ class HierarchyVQSpatialTextureAwareModel():
             lr = self.opt['lr'] * (1 - epoch / self.opt['num_epochs'])
         elif self.opt['lr_decay'] == 'linear2exp':
             if epoch < self.opt['turning_point'] + 1:
-                # learning rate decay as 95%
-                # at the turning point (1 / 95% = 1.0526)
                 lr = self.opt['lr'] * (
                     1 - epoch / int(self.opt['turning_point'] * 1.0526))
             else:
@@ -373,7 +360,6 @@ class HierarchyVQSpatialTextureAwareModel():
                 lr *= self.opt['gamma']
         else:
             raise ValueError('Unknown lr mode {}'.format(self.opt['lr_decay']))
-        # set learning rate
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 

@@ -24,7 +24,6 @@ class TransformerTextureAwareModel():
         self.device = torch.device('cuda')
         self.is_train = opt['is_train']
 
-        # VQVAE for image
         self.img_encoder = Encoder(
             ch=opt['img_ch'],
             num_res_blocks=opt['img_num_res_blocks'],
@@ -58,7 +57,6 @@ class TransformerTextureAwareModel():
                                                    1).to(self.device)
         self.load_pretrained_image_vae()
 
-        # VAE for segmentation mask
         self.segm_encoder = Encoder(
             ch=opt['segm_ch'],
             num_res_blocks=opt['segm_num_res_blocks'],
@@ -79,7 +77,6 @@ class TransformerTextureAwareModel():
                                                1).to(self.device)
         self.load_pretrained_segm_vae()
 
-        # define sampler
         self._denoise_fn = TransformerMultiHead(
             codebook_size=opt['codebook_size'],
             segm_codebook_size=opt['segm_codebook_size'],
@@ -107,7 +104,6 @@ class TransformerTextureAwareModel():
         self.init_training_settings()
 
     def load_pretrained_image_vae(self):
-        # load pretrained vqgan for segmentation mask
         img_ae_checkpoint = torch.load(self.opt['img_ae_path'])
         self.img_encoder.load_state_dict(
             img_ae_checkpoint['encoder'], strict=True)
@@ -126,7 +122,6 @@ class TransformerTextureAwareModel():
         self.img_post_quant_conv.eval()
 
     def load_pretrained_segm_vae(self):
-        # load pretrained vqgan for segmentation mask
         segm_ae_checkpoint = torch.load(self.opt['segm_ae_path'])
         self.segm_encoder.load_state_dict(
             segm_ae_checkpoint['encoder'], strict=True)
@@ -143,7 +138,6 @@ class TransformerTextureAwareModel():
         for v in self._denoise_fn.parameters():
             if v.requires_grad:
                 optim_params.append(v)
-        # set up optimizer
         self.optimizer = torch.optim.Adam(
             optim_params,
             self.opt['lr'],
@@ -155,12 +149,9 @@ class TransformerTextureAwareModel():
         encoded_img = self.img_encoder(image)
         encoded_img = self.img_quant_conv(encoded_img)
 
-        # img_tokens_input is the continual index for the input of transformer
-        # img_tokens_gt_list is the index for 18 texture-aware codebooks respectively
         _, _, [_, img_tokens_input, img_tokens_gt_list
                ] = self.img_quantizer(encoded_img, texture_mask)
 
-        # reshape the tokens
         b = image.size(0)
         img_tokens_input = img_tokens_input.view(b, -1)
         img_tokens_gt_return_list = [
@@ -191,7 +182,7 @@ class TransformerTextureAwareModel():
                 return self.sample_time(b, device, method='uniform')
 
             Lt_sqrt = torch.sqrt(self.Lt_history + 1e-10) + 0.0001
-            Lt_sqrt[0] = Lt_sqrt[1]  # Overwrite decoder term with L1.
+            Lt_sqrt[0] = Lt_sqrt[1] 
             pt_all = Lt_sqrt / Lt_sqrt.sum()
 
             t = torch.multinomial(pt_all, num_samples=b, replacement=True)
@@ -210,17 +201,11 @@ class TransformerTextureAwareModel():
             raise ValueError
 
     def q_sample(self, x_0, x_0_gt_list, t):
-        # samples q(x_t | x_0)
-        # randomly set token to mask with probability t/T
-        # x_t, x_0_ignore = x_0.clone(), x_0.clone()
         x_t = x_0.clone()
 
         mask = torch.rand_like(x_t.float()) < (
             t.float().unsqueeze(-1) / self.num_timesteps)
         x_t[mask] = self.mask_id
-        # x_0_ignore[torch.bitwise_not(mask)] = -1
-
-        # for every gt token list, we also need to do the mask
         x_0_gt_ignore_list = []
         for x_0_gt in x_0_gt_list:
             x_0_gt_ignore = x_0_gt.clone()
@@ -230,23 +215,19 @@ class TransformerTextureAwareModel():
         return x_t, x_0_gt_ignore_list, mask
 
     def _train_loss(self, x_0, x_0_gt_list):
-        b, device = x_0.size(0), x_0.device # x_0 shape (b, 512)
+        b, device = x_0.size(0), x_0.device 
 
-        # choose what time steps to compute loss at
-        t, pt = self.sample_time(b, device, 'uniform') # int, 
+        t, pt = self.sample_time(b, device, 'uniform') 
 
-        # make x noisy and denoise
         if self.mask_schedule == 'random':
             x_t, x_0_gt_ignore_list, mask = self.q_sample(
                 x_0=x_0, x_0_gt_list=x_0_gt_list, t=t)
         else:
             raise NotImplementedError
 
-        # sample p(x_0 | x_t)
         x_0_hat_logits_list = self._denoise_fn(
             x_t, self.segm_tokens, self.texture_tokens, t=t)
 
-        # Always compute ELBO for comparison purposes
         cross_entropy_loss = 0
         for x_0_hat_logits, x_0_gt_ignore in zip(x_0_hat_logits_list,
                                                  x_0_gt_ignore_list):
@@ -262,7 +243,7 @@ class TransformerTextureAwareModel():
             loss = vb_loss
         elif self.loss_type == 'mlm':
             denom = mask.float().sum(1)
-            denom[denom == 0] = 1  # prevent divide by 0 errors.
+            denom[denom == 0] = 1  
             loss = cross_entropy_loss / denom
         elif self.loss_type == 'reweighted_elbo':
             weight = (1 - (t / self.num_timesteps))
@@ -326,7 +307,6 @@ class TransformerTextureAwareModel():
 
         texture_mask_flatten = self.texture_tokens.view(-1)
 
-        # min_encodings_indices_list would be used to visualize the image
         min_encodings_indices_list = [
             torch.full(
                 texture_mask_flatten.size(),
@@ -339,41 +319,35 @@ class TransformerTextureAwareModel():
             print(f'Sample timestep {t:4d}', end='\r')
             t = torch.full((b, ), t, device=device, dtype=torch.long)
 
-            # where to unmask
             changes = torch.rand(
                 x_t.shape, device=device) < 1 / t.float().unsqueeze(-1)
-            # don't unmask somewhere already unmasked
             changes = torch.bitwise_xor(changes,
                                         torch.bitwise_and(changes, unmasked))
-            # update mask with changes
             unmasked = torch.bitwise_or(unmasked, changes)
 
             x_0_logits_list = self._denoise_fn(
                 x_t, self.segm_tokens, self.texture_tokens, t=t)
 
             changes_flatten = changes.view(-1)
-            ori_shape = x_t.shape  # [b, h*w]
-            x_t = x_t.view(-1)  # [b*h*w]
+            ori_shape = x_t.shape 
+            x_t = x_t.view(-1) 
             for codebook_idx, x_0_logits in enumerate(x_0_logits_list):
                 if torch.sum(texture_mask_flatten[changes_flatten] ==
                              codebook_idx) > 0:
-                    # scale by temperature
                     x_0_logits = x_0_logits / temp
                     x_0_dist = dists.Categorical(logits=x_0_logits)
                     x_0_hat = x_0_dist.sample().long()
                     x_0_hat = x_0_hat.view(-1)
 
-                    # only replace the changed indices with corresponding codebook_idx
                     changes_segm = torch.bitwise_and(
                         changes_flatten, texture_mask_flatten == codebook_idx)
 
-                    # x_t would be the input to the transformer, so the index range should be continual one
                     x_t[changes_segm] = x_0_hat[
                         changes_segm] + 1024 * codebook_idx
                     min_encodings_indices_list[codebook_idx][
                         changes_segm] = x_0_hat[changes_segm]
 
-            x_t = x_t.view(ori_shape)  # [b, h*w]
+            x_t = x_t.view(ori_shape) 
 
         min_encodings_indices_return_list = [
             min_encodings_indices.view(ori_shape)
@@ -386,9 +360,7 @@ class TransformerTextureAwareModel():
 
     def get_vis(self, image, gt_indices, predicted_indices, texture_mask,
                 save_path):
-        # original image
         ori_img = self.decode_image_indices(gt_indices, texture_mask)
-        # pred image
         pred_img = self.decode_image_indices(predicted_indices, texture_mask)
         img_cat = torch.cat([
             image,
@@ -425,13 +397,6 @@ class TransformerTextureAwareModel():
         return self.log_dict
 
     def update_learning_rate(self, epoch, iters=None):
-        """Update learning rate.
-
-        Args:
-            current_iter (int): Current iteration.
-            warmup_iter (int): Warmup iter numbers. -1 for no warmup.
-                Default: -1.
-        """
         lr = self.optimizer.param_groups[0]['lr']
 
         if self.opt['lr_decay'] == 'step':
@@ -444,8 +409,6 @@ class TransformerTextureAwareModel():
             lr = self.opt['lr'] * (1 - epoch / self.opt['num_epochs'])
         elif self.opt['lr_decay'] == 'linear2exp':
             if epoch < self.opt['turning_point'] + 1:
-                # learning rate decay as 95%
-                # at the turning point (1 / 95% = 1.0526)
                 lr = self.opt['lr'] * (
                     1 - epoch / int(self.opt['turning_point'] * 1.0526))
             else:
@@ -460,20 +423,12 @@ class TransformerTextureAwareModel():
                 lr = self.opt['lr']
         else:
             raise ValueError('Unknown lr mode {}'.format(self.opt['lr_decay']))
-        # set learning rate
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
         return lr
 
     def save_network(self, net, save_path):
-        """Save networks.
-
-        Args:
-            net (nn.Module): Network to be saved.
-            net_label (str): Network label.
-            current_iter (int): Current iter number.
-        """
         state_dict = net.state_dict()
         torch.save(state_dict, save_path)
 

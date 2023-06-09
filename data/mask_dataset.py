@@ -18,7 +18,6 @@ class MaskDataset(data.Dataset):
         self.downsample_factor = downsample_factor
         self.xflip = xflip
 
-        # load attributes
         assert os.path.exists(f'{ann_dir}/upper_fused.txt')
         for idx, row in enumerate(
                 open(os.path.join(f'{ann_dir}/upper_fused.txt'), 'r')):
@@ -40,7 +39,6 @@ class MaskDataset(data.Dataset):
                 segm = segm.resize(
                     size=(width, height), resample=Image.NEAREST)
             segm = np.array(segm)
-        # segm = segm[:, :, np.newaxis].transpose(2, 0, 1)
         return segm.astype(np.float32)
 
     def __getitem__(self, index):

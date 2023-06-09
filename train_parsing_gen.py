@@ -16,27 +16,22 @@ from utils.util import make_exp_dirs
 
 
 def main():
-    # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, help='Path to option YAML file.')
     args = parser.parse_args()
     opt = parse(args.opt, is_train=True)
 
-    # mkdir and loggers
     make_exp_dirs(opt)
     log_file = osp.join(opt['path']['log'], f"train_{opt['name']}.log")
     logger = get_root_logger(
         logger_name='base', log_level=logging.INFO, log_file=log_file)
     logger.info(dict2str(opt))
-    # initialize tensorboard logger
     tb_logger = None
     if opt['use_tb_logger'] and 'debug' not in opt['name']:
         tb_logger = init_tb_logger(log_dir='./tb_logger/' + opt['name'])
 
-    # convert to NoneDict, which returns None for missing keys
     opt = dict_to_nonedict(opt)
 
-    # set up data loader
     train_dataset = ParsingGenerationDeepFashionAttrSegmDataset(
         segm_dir=opt['segm_dir'],
         pose_dir=opt['pose_dir'],
@@ -82,7 +77,6 @@ def main():
     data_time, iter_time = 0, 0
     current_iter = 0
 
-    # create message logger (formatted outputs)
     msg_logger = MessageLogger(opt, current_iter, tb_logger)
 
     for epoch in range(opt['num_epochs']):
@@ -127,7 +121,6 @@ def main():
             logger.info(f'Best epoch: {best_epoch}, '
                         f'Best test acc: {best_acc: .4f}.')
 
-            # save model
             model.save_network(
                 f'{opt["path"]["models"]}/parsing_generation_epoch{epoch}.pth')
 

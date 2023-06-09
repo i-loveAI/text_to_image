@@ -58,13 +58,13 @@ def generate(poseFile, shapeText, textureText, step):
     result=result.detach().cpu().numpy()
     result*=255
     result=np.asarray(result[0, :, :, :], dtype=np.uint8)
-    save_path='./evaluation_matrix/poses*shape/'
-    image_name=save_path+'shortjacket'+str(step)+".png"
+    save_path='./evaluation_matrix/differentmodel/model2/'
+    image_name=save_path+'model2_'+str(step)+"_4denim.png"
     cv2.imwrite(image_name, result[:, :, ::-1])
 
 if __name__ == '__main__':
     print('Nice Try and Good Luck')
-    poseFile=['./evaluation_matrix/poses/menopen.png', './evaluation_matrix/poses/menstraight.png', './evaluation_matrix/poses/womancross.png', './evaluation_matrix/poses/womanwalk.png']
+    poseFile=['./evaluation_matrix/poses/2mensit.png', './evaluation_matrix/poses/2womanopen.png', './evaluation_matrix/poses/2womenside.png', './evaluation_matrix/poses/2womenstand.png','./evaluation_matrix/poses/2womenstandstraight.png']
     shapeText=sys.argv[1]
     textureText=sys.argv[2]
     for i, posef in enumerate(poseFile):

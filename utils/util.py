@@ -91,33 +91,18 @@ class ProgressBar(object):
 
 
 class AverageMeter(object):
-    """
-    Computes and stores the average and current value
-    Imported from
-    https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
-    """
-
     def __init__(self):
         self.reset()
 
     def reset(self):
         self.val = 0
-        self.avg = 0  # running average = running sum / running count
-        self.sum = 0  # running sum
-        self.count = 0  # running count
+        self.avg = 0 
+        self.sum = 0  
+        self.count = 0  
 
     def update(self, val, n=1):
-        # n = batch_size
-
-        # val = batch accuracy for an attribute
-        # self.val = val
-
-        # sum = 100 * accumulative correct predictions for this attribute
         self.sum += val * n
 
-        # count = total samples so far
         self.count += n
 
-        # avg = 100 * avg accuracy for this attribute
-        # for all the batches so far
         self.avg = self.sum / self.count

@@ -59,13 +59,6 @@ class VQModel():
         self.configure_optimizers()
 
     def save_network(self, save_path):
-        """Save networks.
-
-        Args:
-            net (nn.Module): Network to be saved.
-            net_label (str): Network label.
-            current_iter (int): Current iter number.
-        """
 
         save_dict = {}
         save_dict['encoder'] = self.encoder.state_dict()
@@ -131,13 +124,6 @@ class VQModel():
         return self.log_dict
 
     def update_learning_rate(self, epoch):
-        """Update learning rate.
-
-        Args:
-            current_iter (int): Current iteration.
-            warmup_iter (int): Warmup iter numbers. -1 for no warmup.
-                Default: -1.
-        """
         lr = self.optimizer.param_groups[0]['lr']
 
         if self.opt['lr_decay'] == 'step':
@@ -150,8 +136,6 @@ class VQModel():
             lr = self.opt['lr'] * (1 - epoch / self.opt['num_epochs'])
         elif self.opt['lr_decay'] == 'linear2exp':
             if epoch < self.opt['turning_point'] + 1:
-                # learning rate decay as 95%
-                # at the turning point (1 / 95% = 1.0526)
                 lr = self.opt['lr'] * (
                     1 - epoch / int(self.opt['turning_point'] * 1.0526))
             else:
@@ -161,7 +145,6 @@ class VQModel():
                 lr *= self.opt['gamma']
         else:
             raise ValueError('Unknown lr mode {}'.format(self.opt['lr_decay']))
-        # set learning rate
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
@@ -193,16 +176,13 @@ class VQSegmentationModel(VQModel):
         self.log_dict.update(log_dict_ae)
         
         if x.shape[1] > 3:
-            # colorize with random projection
             assert xrec.shape[1] > 3
-            # convert logits to indices
             xrec = torch.argmax(xrec, dim=1, keepdim=True)
             xrec = F.one_hot(xrec, num_classes=x.shape[1])
             xrec = xrec.squeeze(1).permute(0, 3, 1, 2).float()
             x = self.to_rgb(x)
             xrec = self.to_rgb(xrec)
         
-        # import pdb; pdb.set_trace()
         STEPS = 20
         if current_iter % STEPS == 0:
             pipeline(x, xrec)
@@ -240,9 +220,7 @@ class VQSegmentationModel(VQModel):
             num += x.size(0)
 
             if x.shape[1] > 3:
-                # colorize with random projection
                 assert xrec.shape[1] > 3
-                # convert logits to indices
                 xrec = torch.argmax(xrec, dim=1, keepdim=True)
                 xrec = F.one_hot(xrec, num_classes=x.shape[1])
                 xrec = xrec.squeeze(1).permute(0, 3, 1, 2).float()
@@ -302,17 +280,14 @@ class VQImageModel(VQModel):
         x = self.feed_data(data)
         xrec, codebook_loss = self.forward_step(x)
 
-        # get recon/perceptual loss
         recon_loss = torch.abs(x.contiguous() - xrec.contiguous())
         p_loss = self.perceptual(x.contiguous(), xrec.contiguous())
         nll_loss = recon_loss + self.perceptual_weight * p_loss
         nll_loss = torch.mean(nll_loss)
 
-        # augment for input to discriminator
         if self.diff_aug:
             xrec = DiffAugment(xrec, policy=self.policy)
 
-        # update generator
         logits_fake = self.disc(xrec)
         g_loss = -torch.mean(logits_fake)
         last_layer = self.decoder.conv_out.weight
@@ -336,7 +311,7 @@ class VQImageModel(VQModel):
             else:
                 logits_real = self.disc(x.contiguous().detach())
             logits_fake = self.disc(xrec.contiguous().detach(
-            ))  # detach so that generator isn"t also updated
+            ))  
             d_loss = hinge_d_loss(logits_real, logits_fake)
             self.log_dict["d_loss"] = d_loss
         else:
@@ -386,9 +361,7 @@ class VQImageModel(VQModel):
             num += x.size(0)
 
             if x.shape[1] > 3:
-                # colorize with random projection
                 assert xrec.shape[1] > 3
-                # convert logits to indices
                 xrec = torch.argmax(xrec, dim=1, keepdim=True)
                 xrec = F.one_hot(xrec, num_classes=x.shape[1])
                 xrec = xrec.squeeze(1).permute(0, 3, 1, 2).float()
@@ -460,19 +433,16 @@ class VQImageSegmTextureModel(VQImageModel):
         return x, mask
 
     def training_step(self, data, step):
-        x, mask = self.feed_data(data) # x.shape == [1, 3, 512, 256]
-        xrec, codebook_loss = self.forward_step(x, mask) # xrec.shape == [1, 3, 512, 256]
-        # get recon/perceptual loss
+        x, mask = self.feed_data(data) 
+        xrec, codebook_loss = self.forward_step(x, mask)
         recon_loss = torch.abs(x.contiguous() - xrec.contiguous())
         p_loss = self.perceptual(x.contiguous(), xrec.contiguous())
         nll_loss = recon_loss + self.perceptual_weight * p_loss
         nll_loss = torch.mean(nll_loss)
 
-        # augment for input to discriminator
         if self.diff_aug:
             xrec = DiffAugment(xrec, policy=self.policy)
 
-        # update generator
         logits_fake = self.disc(xrec)
         g_loss = -torch.mean(logits_fake)
         last_layer = self.decoder.conv_out.weight
@@ -496,13 +466,12 @@ class VQImageSegmTextureModel(VQImageModel):
             else:
                 logits_real = self.disc(x.contiguous().detach())
             logits_fake = self.disc(xrec.contiguous().detach(
-            ))  # detach so that generator isn"t also updated
+            ))  
             d_loss = hinge_d_loss(logits_real, logits_fake)
             self.log_dict["d_loss"] = d_loss
         else:
             d_loss = None
             
-        # Show the images of original and the generated image.
         STEPS = 20
         if step % STEPS == 0:
             pipeline(x, xrec)
@@ -522,9 +491,7 @@ class VQImageSegmTextureModel(VQImageModel):
 
         for _, data in enumerate(data_loader):
             img_name = data['img_name'][0]
-            ############## Debug #################
             import pdb; pdb.set_trace()
-            ############## Debug #################
             x, mask = self.feed_data(data)
             xrec, _ = self.forward_step(x, mask)
 
@@ -537,9 +504,7 @@ class VQImageSegmTextureModel(VQImageModel):
             num += x.size(0)
 
             if x.shape[1] > 3:
-                # colorize with random projection
                 assert xrec.shape[1] > 3
-                # convert logits to indices
                 xrec = torch.argmax(xrec, dim=1, keepdim=True)
                 xrec = F.one_hot(xrec, num_classes=x.shape[1])
                 xrec = xrec.squeeze(1).permute(0, 3, 1, 2).float()

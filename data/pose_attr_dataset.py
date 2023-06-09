@@ -27,7 +27,6 @@ class DeepFashionAttrPoseDataset(data.Dataset):
         self.downsample_factor = downsample_factor
         self.xflip = xflip
 
-        # load attributes
         assert os.path.exists(f'{texture_ann_dir}/upper_fused.txt')
         for idx, row in enumerate(
                 open(os.path.join(f'{texture_ann_dir}/upper_fused.txt'), 'r')):
@@ -76,7 +75,6 @@ class DeepFashionAttrPoseDataset(data.Dataset):
                 height = height // self.downsample_factor
                 densepose = densepose.resize(
                     size=(width, height), resample=Image.NEAREST)
-            # channel-wise IUV order, [3, H, W]
             densepose = np.array(densepose)[:, :, 2:].transpose(2, 0, 1)
         return densepose.astype(np.float32)
 

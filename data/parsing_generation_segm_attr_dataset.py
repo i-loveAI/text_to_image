@@ -16,11 +16,10 @@ class ParsingGenerationDeepFashionAttrSegmDataset(data.Dataset):
         self._densepose_path = pose_dir
         self._segm_path = segm_dir
         self._image_fnames = []
-        self.attrs = [] # For the text(split) of each image
+        self.attrs = []
 
         self.downsample_factor = downsample_factor
 
-        # training, ground-truth available
         assert os.path.exists(ann_file)
         captions = Read_MultiModel_Captions()
         
@@ -43,7 +42,7 @@ class ParsingGenerationDeepFashionAttrSegmDataset(data.Dataset):
                 height = height // self.downsample_factor
                 densepose = densepose.resize(
                     size=(width, height), resample=Image.NEAREST)
-            # channel-wise IUV order, [3, H, W]
+
             densepose = np.array(densepose)[:, :, 2:].transpose(2, 0, 1)
         return densepose.astype(np.float32)
 
@@ -68,7 +67,7 @@ class ParsingGenerationDeepFashionAttrSegmDataset(data.Dataset):
 
         pose = torch.from_numpy(pose)
         segm = torch.LongTensor(segm)
-        # attr = torch.LongTensor(attr)
+
 
         pose = pose / 12. - 1
 

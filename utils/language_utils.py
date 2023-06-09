@@ -5,7 +5,6 @@ import torch
 from pip import main
 from sentence_transformers import SentenceTransformer, util
 
-# predefined shape text
 upper_length_text = [
     'sleeveless', 'without sleeves', 'sleeves have been cut off', 'tank top',
     'tank shirt', 'muscle shirt', 'short-sleeve', 'short sleeves',

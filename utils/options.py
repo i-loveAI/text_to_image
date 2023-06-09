@@ -6,11 +6,6 @@ import yaml
 
 
 def ordered_yaml():
-    """Support OrderedDict for yaml.
-
-    Returns:
-        yaml Loader and Dumper.
-    """
     try:
         from yaml import CDumper as Dumper
         from yaml import CLoader as Loader
@@ -31,15 +26,6 @@ def ordered_yaml():
 
 
 def parse(opt_path, is_train=True):
-    """Parse option file.
-
-    Args:
-        opt_path (str): Option file path.
-        is_train (str): Indicate whether in training or not. Default: True.
-
-    Returns:
-        (dict): Options.
-    """
     with open(opt_path, mode='r') as f:
         Loader, _ = ordered_yaml()
         opt = yaml.load(f, Loader=Loader)
@@ -53,7 +39,6 @@ def parse(opt_path, is_train=True):
 
     opt['is_train'] = is_train
 
-    # paths
     opt['path'] = {}
     opt['path']['root'] = osp.abspath(
         osp.join(__file__, osp.pardir, osp.pardir))
@@ -66,13 +51,12 @@ def parse(opt_path, is_train=True):
         opt['path']['visualization'] = osp.join(experiments_root,
                                                 'visualization')
 
-        # change some options for debug mode
         if 'debug' in opt['name']:
             opt['debug'] = True
             opt['val_freq'] = 1
             opt['print_freq'] = 1
             opt['save_checkpoint_freq'] = 1
-    else:  # test
+    else: 
         results_root = osp.join(opt['path']['root'], 'results', opt['name'])
         opt['path']['results_root'] = results_root
         opt['path']['log'] = results_root
@@ -82,15 +66,6 @@ def parse(opt_path, is_train=True):
 
 
 def dict2str(opt, indent_level=1):
-    """dict to string for printing options.
-
-    Args:
-        opt (dict): Option dict.
-        indent_level (int): Indent level. Default: 1.
-
-    Return:
-        (str): Option string for printing.
-    """
     msg = ''
     for k, v in opt.items():
         if isinstance(v, dict):
@@ -103,21 +78,12 @@ def dict2str(opt, indent_level=1):
 
 
 class NoneDict(dict):
-    """None dict. It will return none if key is not in the dict."""
 
     def __missing__(self, key):
         return None
 
 
 def dict_to_nonedict(opt):
-    """Convert to NoneDict, which returns None for missing keys.
-
-    Args:
-        opt (dict): Option dict.
-
-    Returns:
-        (dict): NoneDict for options.
-    """
     if isinstance(opt, dict):
         new_opt = dict()
         for key, sub_opt in opt.items():

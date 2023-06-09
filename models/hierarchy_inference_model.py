@@ -112,7 +112,6 @@ class VQGANTextureAwareSpatialHierarchyInferenceModel():
         for v in self.index_decoder.parameters():
             if v.requires_grad:
                 optim_params.append(v)
-        # set up optimizers
         if self.opt['optimizer'] == 'Adam':
             self.optimizer = torch.optim.Adam(
                 optim_params,
@@ -129,7 +128,6 @@ class VQGANTextureAwareSpatialHierarchyInferenceModel():
             self.loss_func = CrossEntropyLoss().to(self.device)
 
     def load_top_pretrain_models(self):
-        # load pretrained vqgan for segmentation mask
         top_vae_checkpoint = torch.load(self.opt['top_vae_path'])
         self.top_encoder.load_state_dict(
             top_vae_checkpoint['encoder'], strict=True)
@@ -201,7 +199,7 @@ class VQGANTextureAwareSpatialHierarchyInferenceModel():
             index_bottom_list, texture_mask,
             (index_bottom_list[0].size(0), index_bottom_list[0].size(1),
              index_bottom_list[0].size(2),
-             self.opt["bot_z_channels"]))  #.permute(0, 3, 1, 2)
+             self.opt["bot_z_channels"]))  
         quant_b = self.bot_post_quant_conv(quant_b)
         bot_dec_res = self.bot_decoder_res(quant_b)
 
@@ -268,7 +266,6 @@ class VQGANTextureAwareSpatialHierarchyInferenceModel():
             with torch.no_grad():
                 self.feature_enc = self.guidance_encoder(self.feature_t)
                 memory_logits_list = self.index_decoder(self.feature_enc)
-            # memory_indices_pred = memory_logits.argmax(dim=1)
             batch_acc = 0
             for codebook_idx, memory_logits in enumerate(memory_logits_list):
                 region_of_interest = texture_mask_flatten == codebook_idx
@@ -342,8 +339,6 @@ class VQGANTextureAwareSpatialHierarchyInferenceModel():
             lr = self.opt['lr'] * (1 - epoch / self.opt['num_epochs'])
         elif self.opt['lr_decay'] == 'linear2exp':
             if epoch < self.opt['turning_point'] + 1:
-                # learning rate decay as 95%
-                # at the turning point (1 / 95% = 1.0526)
                 lr = self.opt['lr'] * (
                     1 - epoch / int(self.opt['turning_point'] * 1.0526))
             else:
@@ -353,7 +348,6 @@ class VQGANTextureAwareSpatialHierarchyInferenceModel():
                 lr *= self.opt['gamma']
         else:
             raise ValueError('Unknown lr mode {}'.format(self.opt['lr_decay']))
-        # set learning rate
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 

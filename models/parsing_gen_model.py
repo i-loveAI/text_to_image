@@ -59,7 +59,7 @@ class ParsingGenModel():
 
     def init_training_settings(self):
         optim_params = []
-        for v in self.attr_linear.parameters(): # Freeze the text embeddings extracted by CLIP and just train the linear projection.
+        for v in self.attr_linear.parameters():
             if v.requires_grad:
                 optim_params.append(v)
         for v in self.parsing_encoder.parameters():
@@ -68,7 +68,6 @@ class ParsingGenModel():
         for v in self.parsing_decoder.parameters():
             if v.requires_grad:
                 optim_params.append(v)
-        # set up optimizers
         self.optimizer = torch.optim.Adam(
             optim_params,
             self.opt['lr'],
@@ -78,12 +77,10 @@ class ParsingGenModel():
 
     def feed_data(self, data):
         self.pose = data['densepose'].to(self.device)
-        # self.attr = data['attr'].to(self.device)
         self.attr = data['attr']
         self.segm = data['segm'].to(self.device)
 
     def optimize_parameters(self):
-        # self.attr_embedder.train()
         self.parsing_encoder.train()
         self.parsing_decoder.train()
         self.attr_linear.train()
@@ -156,13 +153,6 @@ class ParsingGenModel():
         return self.log_dict
 
     def update_learning_rate(self, epoch):
-        """Update learning rate.
-
-        Args:
-            current_iter (int): Current iteration.
-            warmup_iter (int): Warmup iter numbers. -1 for no warmup.
-                Default: -1.
-        """
         lr = self.optimizer.param_groups[0]['lr']
 
         if self.opt['lr_decay'] == 'step':
@@ -175,8 +165,6 @@ class ParsingGenModel():
             lr = self.opt['lr'] * (1 - epoch / self.opt['num_epochs'])
         elif self.opt['lr_decay'] == 'linear2exp':
             if epoch < self.opt['turning_point'] + 1:
-                # learning rate decay as 95%
-                # at the turning point (1 / 95% = 1.0526)
                 lr = self.opt['lr'] * (
                     1 - epoch / int(self.opt['turning_point'] * 1.0526))
             else:
@@ -186,7 +174,6 @@ class ParsingGenModel():
                 lr *= self.opt['gamma']
         else:
             raise ValueError('Unknown lr mode {}'.format(self.opt['lr_decay']))
-        # set learning rate
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
@@ -225,6 +212,5 @@ class ParsingGenModel():
         color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
         for label, color in enumerate(palette):
             color_seg[seg == label, :] = color
-        # convert to BGR
         color_seg = color_seg[..., ::-1]
         return color_seg

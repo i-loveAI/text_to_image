@@ -28,13 +28,11 @@ class DeepFashionAttrSegmDataset(data.Dataset):
         self.downsample_factor = downsample_factor
         self.xflip = xflip
 
-        # load attributes
         assert os.path.exists(f'{ann_dir}/upper_fused.txt')
         for idx, row in enumerate(
                 open(os.path.join(f'{ann_dir}/upper_fused.txt'), 'r')):
             annotations = row.split()
             self._image_fnames.append(annotations[0])
-            # assert self._image_fnames[idx] == annotations[0]
             self.upper_fused_attrs.append(int(annotations[1]))
 
         assert len(self._image_fnames) == len(self.upper_fused_attrs)
@@ -57,9 +55,6 @@ class DeepFashionAttrSegmDataset(data.Dataset):
 
         assert len(self._image_fnames) == len(self.outer_fused_attrs)
 
-        # remove the overlapping item between upper cls and lower cls
-        # cls 21 can appear with upper clothes
-        # cls 4 can appear with lower clothes
         self.upper_cls = [1., 4.]
         self.lower_cls = [3., 5., 21.]
         self.outer_cls = [2.]
@@ -83,8 +78,8 @@ class DeepFashionAttrSegmDataset(data.Dataset):
                     size=(width, height), resample=Image.LANCZOS)
             image = np.array(image)
         if image.ndim == 2:
-            image = image[:, :, np.newaxis]  # HW => HWC
-        image = image.transpose(2, 0, 1)  # HWC => CHW
+            image = image[:, :, np.newaxis] 
+        image = image.transpose(2, 0, 1) 
         return image
 
     def _load_densepose(self, raw_idx):
@@ -98,7 +93,6 @@ class DeepFashionAttrSegmDataset(data.Dataset):
                 height = height // self.downsample_factor
                 densepose = densepose.resize(
                     size=(width, height), resample=Image.NEAREST)
-            # channel-wise IUV order, [3, H, W]
             densepose = np.array(densepose)[:, :, 2:].transpose(2, 0, 1)
         return densepose.astype(np.float32)
 
@@ -135,8 +129,6 @@ class DeepFashionAttrSegmDataset(data.Dataset):
         lower_fused_attr = self.lower_fused_attrs[index]
         outer_fused_attr = self.outer_fused_attrs[index]
 
-        # mask 0: denotes the common codebook,
-        # mask (attr + 1): denotes the texture-specific codebook
         mask = torch.zeros_like(segm)
         if upper_fused_attr != 17:
             for cls in self.upper_cls:
